@@ -3,7 +3,7 @@ import requests
 
 API_KEY = "39a81eaad8f4d90734462eed7dfc5413"
 
-# ================= CURRENT WEATHER =================
+#CURRENT WEATHER
 def find_current_weather(city):
     url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={API_KEY}&units=metric"
     data = requests.get(url).json()
@@ -28,33 +28,33 @@ def find_current_weather(city):
     return weather, temp, humidity, rain, wind_speed, icon
 
 
-# ================= HEAT =================
+#heat index
 def heat_index_classification(temp):
     if temp >= 52:
-        return "🔥 Extreme Danger", "Heat stroke likely!"
+        return "Extreme Danger", "Heat stroke likely!"
     elif temp >= 42:
-        return "⚠️ Danger", "Heat cramps & exhaustion likely"
+        return "Danger", "Heat cramps & exhaustion likely"
     elif temp >= 33:
-        return "⚡ Extreme Caution", "Possible heat exhaustion"
+        return "Extreme Caution", "Possible heat exhaustion"
     elif temp >= 27:
-        return "☀️ Caution", "Fatigue possible"
+        return "Caution", "Fatigue possible"
     else:
-        return "✅ Normal", "Safe conditions"
+        return "Normal", "Safe conditions"
 
 
-# ================= RAIN (PAGASA STYLE) =================
+#rainfall warning
 def rainfall_classification(rain):
     if rain >= 30:
-        return "🔴 RED WARNING", "Serious flooding expected — suspend classes!"
+        return "RED WARNING", "Serious flooding expected — suspend classes!"
     elif rain >= 15:
-        return "🟠 ORANGE WARNING", "Flooding threatening"
+        return "ORANGE WARNING", "Flooding threatening"
     elif rain >= 7.5:
-        return "🟡 YELLOW WARNING", "Flooding possible"
+        return "YELLOW WARNING", "Flooding possible"
     else:
-        return "☀️ No Warning", "Normal conditions"
+        return " No Warning", "Normal conditions"
 
 
-# ================= FORECAST =================
+#forecast
 def get_forecast(city):
     url = f"https://api.openweathermap.org/data/2.5/forecast?q={city}&appid={API_KEY}&units=metric"
     data = requests.get(url).json()
@@ -75,9 +75,9 @@ def get_forecast(city):
     return forecast_list
 
 
-# ================= MAIN =================
+#main function
 def main():
-    st.title("🌤️ Weather + Heat, Rain & Typhoon Monitor")
+    st.title("Heat Index and Rainfall Warning Advisory")
 
     city_input = st.text_input("Enter City", key="city_input")
 
@@ -104,27 +104,27 @@ def main():
             st.write(weather)
             st.image(icon)
 
-        # 🔥 HEAT
+    #heat
         heat_lvl, heat_msg = heat_index_classification(temp)
-        st.subheader("🔥 Heat Index")
+        st.subheader("Heat Index")
         st.warning(f"{heat_lvl} — {heat_msg}")
 
         if temp >= 40:
-            st.error("🚨 TEMP WARNING: ≥40°C — Suspend classes!")
+            st.error("TEMP WARNING: ≥40°C — Suspend classes!")
 
-        # 🌧️ RAIN
+    #rain
         rain_lvl, rain_msg = rainfall_classification(rain)
-        st.subheader("🌧️ Rain Warning")
+        st.subheader("Rain Warning")
         st.info(f"{rain_lvl} — {rain_msg}")
 
         if rain >= 30:
-            st.error("🚨 RAIN WARNING: Heavy rainfall — Suspend classes!")
+            st.error("RAIN WARNING: Heavy rainfall — Suspend classes!")
 
         if wind >= 121:
-            st.error("🚨 TYPHOON WARNING: Signal #3+ — Suspend classes!")
+            st.error("TYPHOON WARNING: Signal #3+ — Suspend classes!")
 
-        # 📅 FORECAST
-        st.subheader("📅 5-Day Forecast")
+    #5day forecast
+        st.subheader("5-Day Forecast")
         forecast = get_forecast(city)
 
         if forecast:
