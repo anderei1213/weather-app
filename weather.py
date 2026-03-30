@@ -14,10 +14,10 @@ def find_current_weather(city):
         temp = round(data['main']['temp'])
         humidity = data['main']['humidity']
 
-        # 🌧️ Rain (mm)
+        # Rain
         rain = data.get('rain', {}).get('1h', 0)
 
-        # 🌪️ Wind speed (convert m/s → km/h)
+        # Wind speed
         wind_speed = data['wind']['speed'] * 3.6
 
         icon = f"http://openweathermap.org/img/wn/{icon_id}@2x.png"
@@ -55,25 +55,20 @@ def rainfall_classification(rain):
 
 
 #forecast
-def get_forecast(city):
+def get_total_rain(city):
     url = f"https://api.openweathermap.org/data/2.5/forecast?q={city}&appid={API_KEY}&units=metric"
     data = requests.get(url).json()
 
-    forecast_list = []
+    total_rain = 0
 
     try:
-        for i in range(0, len(data['list']), 8):
-            day = data['list'][i]
-            temp = round(day['main']['temp'])
-            weather = day['weather'][0]['main']
-            icon = f"http://openweathermap.org/img/wn/{day['weather'][0]['icon']}@2x.png"
-
-            forecast_list.append((temp, weather, icon))
+        for i in range(8):  # next 24 hours (8 × 3h)
+            rain = data['list'][i].get('rain', {}).get('3h', 0)
+            total_rain += rain
     except:
-        return []
+        return 0
 
-    return forecast_list
-
+    return total_rain
 
 #main function
 def main():
@@ -113,7 +108,8 @@ def main():
             st.error("TEMP WARNING: ≥40°C — Suspend classes!")
 
     #rain
-        rain_lvl, rain_msg = rainfall_classification(rain)
+        total_rain = get_total_rain(city)
+        rain_lvl, rain_msg = rainfall_classification(total_rain)
         st.subheader("Rain Warning")
         st.info(f"{rain_lvl} — {rain_msg}")
 
