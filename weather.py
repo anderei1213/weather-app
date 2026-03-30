@@ -70,7 +70,9 @@ def get_total_rain(city):
 
     return total_rain
 
-    def get_forecast(city):
+
+#forecast (5-day)
+def get_forecast(city):
     url = f"https://api.openweathermap.org/data/2.5/forecast?q={city}&appid={API_KEY}&units=metric"
     data = requests.get(url).json()
 
@@ -88,6 +90,8 @@ def get_total_rain(city):
         return []
 
     return forecast_list
+
+
 #main function
 def main():
     st.title("Heat Index and Rainfall Warning Advisory")
@@ -131,7 +135,7 @@ def main():
         st.subheader("Rain Warning")
         st.info(f"{rain_lvl} — {rain_msg}")
 
-        if rain >= 30:
+        if total_rain >= 30:
             st.error("RAIN WARNING: Heavy rainfall — Suspend classes!")
 
         if wind >= 121:
