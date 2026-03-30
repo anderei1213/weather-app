@@ -25,7 +25,7 @@ def find_current_weather(city):
         st.error("City not found")
         st.stop()
 
-    return weather, temp, humidity, rain, wind_speed, icon
+    return weather, temp, rain, wind_speed, icon
 
 
 #heat index
@@ -106,14 +106,13 @@ def main():
 
         city = city_input.lower()
 
-        weather, temp, humidity, rain, wind, icon = find_current_weather(city)
+        weather, temp, rain, wind, icon = find_current_weather(city)
 
         st.subheader("Current Weather")
         col1, col2 = st.columns(2)
 
         with col1:
             st.metric("Temperature", f"{temp}°C")
-            st.metric("Humidity", f"{humidity}%")
             st.metric("Rain (1h)", f"{rain} mm")
             st.metric("Wind", f"{round(wind)} km/h")
 
