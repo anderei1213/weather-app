@@ -70,6 +70,24 @@ def get_total_rain(city):
 
     return total_rain
 
+    def get_forecast(city):
+    url = f"https://api.openweathermap.org/data/2.5/forecast?q={city}&appid={API_KEY}&units=metric"
+    data = requests.get(url).json()
+
+    forecast_list = []
+
+    try:
+        for i in range(0, len(data['list']), 8):
+            day = data['list'][i]
+            temp = round(day['main']['temp'])
+            weather = day['weather'][0]['main']
+            icon = f"http://openweathermap.org/img/wn/{day['weather'][0]['icon']}@2x.png"
+
+            forecast_list.append((temp, weather, icon))
+    except:
+        return []
+
+    return forecast_list
 #main function
 def main():
     st.title("Heat Index and Rainfall Warning Advisory")
