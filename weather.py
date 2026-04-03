@@ -1,157 +1,118 @@
 import streamlit as st
 import requests
+from datetime import datetime
+import time
 
+# 1. API SETTINGS
 API_KEY = "39a81eaad8f4d90734462eed7dfc5413"
 
-#CURRENT WEATHER
-def find_current_weather(city):
-    url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={API_KEY}&units=metric"
-    data = requests.get(url).json()
-
-    try:
-        weather = data['weather'][0]['main']
-        icon_id = data['weather'][0]['icon']
-        temp = round(data['main']['temp'])
-        humidity = data['main']['humidity']
-
-        # Rain
-        rain = data.get('rain', {}).get('1h', 0)
-
-        # Wind speed
-        wind_speed = data['wind']['speed'] * 3.6
-
-        icon = f"http://openweathermap.org/img/wn/{icon_id}@2x.png"
-    except:
-        st.error("City not found")
-        st.stop()
-
-    return weather, temp, rain, wind_speed, icon
-
-
-#heat index
-def heat_index_classification(temp):
-    if temp >= 52:
-        return "Extreme Danger", "Heat stroke likely!"
-    elif temp >= 42:
-        return "Danger", "Heat cramps & exhaustion likely"
-    elif temp >= 33:
-        return "Extreme Caution", "Possible heat exhaustion"
-    elif temp >= 27:
-        return "Caution", "Fatigue possible"
+# 2. THE DESIGNER (Now handles Day, Night, and Stormy backgrounds)
+def apply_design(weather_main, is_day):
+    # Default Morning/Day Colors
+    if is_day:
+        if "Clear" in weather_main:
+            bg = "linear-gradient(to bottom, #4facfe, #00f2fe)" # Bright Sunny Blue
+        elif "Rain" in weather_main or "Thunderstorm" in weather_main:
+            bg = "linear-gradient(to bottom, #203a43, #2c5364)" # Gloomy Rainy Day
+        else:
+            bg = "linear-gradient(to bottom, #757f9a, #d7dde8)" # Cloudy Grey
+    
+    # Night Colors (Dark Mode)
     else:
-        return "Normal", "Safe conditions"
+        bg = "linear-gradient(to bottom, #0f2027, #203a43, #2c5364)" # Deep Midnight Blue
 
+    st.markdown(f"""
+    <style>
+    .stApp {{ background: {bg}; color: white; transition: 1s; }}
+    
+    [data-testid="stVerticalBlockBorderWrapper"] {{
+        background: rgba(255, 255, 255, 0.1) !important;
+        backdrop-filter: blur(10px) !important;
+        border-radius: 20px !important;
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        padding: 20px !important;
+    }}
+    </style>
+    """, unsafe_allow_html=True)
 
-#rainfall warning
-def rainfall_classification(rain):
-    if rain >= 30:
-        return "RED WARNING", "Serious flooding expected — suspend classes!"
-    elif rain >= 15:
-        return "ORANGE WARNING", "Flooding threatening"
-    elif rain >= 7.5:
-        return "YELLOW WARNING", "Flooding possible"
-    else:
-        return " No Warning", "Normal conditions"
-
-
-#forecast
-def get_total_rain(city):
-    url = f"https://api.openweathermap.org/data/2.5/forecast?q={city}&appid={API_KEY}&units=metric"
-    data = requests.get(url).json()
-
+# 3. WEATHER & RAINFALL DATA LOGIC
+def get_weather_data(city):
+    curr_url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={API_KEY}&units=metric"
+    curr_data = requests.get(curr_url).json()
+    
+    fore_url = f"https://api.openweathermap.org/data/2.5/forecast?q={city}&appid={API_KEY}&units=metric"
+    fore_data = requests.get(fore_url).json()
+    
     total_rain = 0
-
-    try:
-        for i in range(8):  # next 24 hours (8 × 3h)
-            rain = data['list'][i].get('rain', {}).get('3h', 0)
+    if fore_data.get("cod") == "200":
+        for i in range(8):
+            rain = fore_data['list'][i].get('rain', {}).get('3h', 0)
             total_rain += rain
-    except:
-        return 0
+            
+    return curr_data, total_rain
 
-    return total_rain
-
-
-#forecast (5-day)
-def get_forecast(city):
-    url = f"https://api.openweathermap.org/data/2.5/forecast?q={city}&appid={API_KEY}&units=metric"
-    data = requests.get(url).json()
-
-    forecast_list = []
-
-    try:
-        for i in range(0, len(data['list']), 8):
-            day = data['list'][i]
-            temp = round(day['main']['temp'])
-            weather = day['weather'][0]['main']
-            icon = f"http://openweathermap.org/img/wn/{day['weather'][0]['icon']}@2x.png"
-
-            forecast_list.append((temp, weather, icon))
-    except:
-        return []
-
-    return forecast_list
-
-
-#main function
+# 4. MAIN APP
 def main():
-    st.title("Heat Index and Rainfall Warning Advisory")
+    st.title("🌤️ My Weather App")
+    
+    city_name = st.text_input("Type a city name:", value="Manila")
+    data, total_rain = get_weather_data(city_name)
+    
+    if data.get("cod") == 200:
+        # Check if it is currently Day or Night in that city
+        current_time = time.time()
+        sunrise = data['sys']['sunrise']
+        sunset = data['sys']['sunset']
+        is_day = sunrise < current_time < sunset
+        
+        # Apply the Design
+        apply_design(data['weather'][0]['main'], is_day)
+        
+        # --- DAY/NIGHT STATUS ---
+        status_icon = "☀️ Morning" if is_day else "🌙 Night Time"
+        st.write(f"Currently: **{status_icon}**")
 
-    city_input = st.text_input("Enter City", key="city_input")
+        # --- BOX 1: CITY & TEMPERATURE ---
+        with st.container(border=True): 
+            col1, col2 = st.columns(2)
+            with col1:
+                st.header(data['name'])
+                st.write(datetime.now().strftime('%A, %B %d'))
+                st.write(f"💧 Humidity: {data['main']['humidity']}%")
+                st.write(f"💨 Wind: {round(data['wind']['speed'] * 3.6)} km/h")
+            with col2:
+                st.markdown(f"<h1 style='text-align: right; font-size: 80px; font-weight: 200;'>+{round(data['main']['temp'])}°C</h1>", unsafe_allow_html=True)
 
-    if st.button("Check Weather", key="check_btn"):
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.subheader("📢 Advisories")
 
-        if not city_input:
-            st.warning("Please enter a city")
-            return
+        # --- BOX 2: RAINFALL ADVISORY ---
+        with st.container(border=True):
+            st.markdown(f"### 🌧️ 24h Rainfall: {total_rain} mm")
+            if total_rain >= 30:
+                st.error("🚨 RED WARNING: Serious flooding - Suspend classes!")
+            elif total_rain >= 15:
+                st.warning("🟠 ORANGE WARNING: Flooding is threatening.")
+            elif total_rain >= 7.5:
+                st.info("🟡 YELLOW WARNING: Flooding is possible.")
+            else:
+                st.markdown("✅ Rainfall is normal.")
 
-        city = city_input.lower()
+        st.markdown("<br>", unsafe_allow_html=True)
 
-        weather, temp, rain, wind, icon = find_current_weather(city)
+        # --- BOX 3: HEAT INDEX ADVISORY ---
+        with st.container(border=True):
+            temp = data['main']['temp']
+            st.markdown(f"### 🌡️ Heat Index: {round(temp)}°C")
+            if temp >= 42:
+                st.error("🔥 Extreme Danger: Heat stroke likely! Suspend classes.")
+            elif temp >= 33:
+                st.warning("⚠️ Danger: Heat cramps and exhaustion likely.")
+            else:
+                st.markdown("✅ Temperature is normal.")
 
-        st.subheader("Current Weather")
-        col1, col2 = st.columns(2)
+    else:
+        st.error("City not found!")
 
-        with col1:
-            st.metric("Temperature", f"{temp}°C")
-            st.metric("Rain (1h)", f"{rain} mm")
-            st.metric("Wind", f"{round(wind)} km/h")
-
-        with col2:
-            st.write(weather)
-            st.image(icon)
-
-    #heat
-        heat_lvl, heat_msg = heat_index_classification(temp)
-        st.subheader("Heat Index")
-        st.warning(f"{heat_lvl} — {heat_msg}")
-
-        if temp >= 40:
-            st.error("TEMP WARNING: ≥40°C — Suspend classes!")
-
-    #rain
-        total_rain = get_total_rain(city)
-        rain_lvl, rain_msg = rainfall_classification(total_rain)
-        st.subheader("Rain Warning")
-        st.info(f"{rain_lvl} — {rain_msg}")
-
-        if total_rain >= 30:
-            st.error("RAIN WARNING: Heavy rainfall — Suspend classes!")
-
-        if wind >= 121:
-            st.error("TYPHOON WARNING: Signal #3+ — Suspend classes!")
-
-    #5day forecast
-        st.subheader("5-Day Forecast")
-        forecast = get_forecast(city)
-
-        if forecast:
-            cols = st.columns(len(forecast))
-            for i, (f_temp, f_weather, f_icon) in enumerate(forecast):
-                with cols[i]:
-                    st.image(f_icon)
-                    st.write(f"{f_temp}°C")
-                    st.write(f_weather)
-
-
-# RUN
-main()
+if __name__ == "__main__":
+    main()
