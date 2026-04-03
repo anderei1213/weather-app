@@ -5,10 +5,9 @@ import time
 
 # 1. API SETTINGS
 API_KEY = "39a81eaad8f4d90734462eed7dfc5413"
-st.title("Weather Advisory Web App")
-# 2. MOBILE-FIRST DESIGNER
+
+# 2. MOBILE DESIGNER
 def apply_mobile_design(weather_main, is_day):
-    # Background Logic
     if is_day:
         if "Clear" in weather_main:
             bg = "linear-gradient(to bottom, #4facfe, #00f2fe)"
@@ -21,108 +20,115 @@ def apply_mobile_design(weather_main, is_day):
 
     st.markdown(f"""
     <style>
-    /* Force mobile-friendly background */
-    .stApp {{ 
-        background: {bg}; 
-        color: white; 
-        transition: 0.5s;
-    }}
+    .stApp {{ background: {bg}; color: white; transition: 0.5s; }}
     
-    /* Make containers look like sleek mobile cards */
+    /* Mobile Glass Cards */
     [data-testid="stVerticalBlockBorderWrapper"] {{
         background: rgba(255, 255, 255, 0.15) !important;
         backdrop-filter: blur(12px) !important;
-        border-radius: 25px !important;
+        border-radius: 20px !important;
         border: 1px solid rgba(255, 255, 255, 0.2) !important;
         padding: 15px !important;
         margin-bottom: 10px !important;
     }}
 
-    /* Adjust font sizes for mobile screens */
-    h1 {{ font-size: 2.2rem !important; }}
-    h2 {{ font-size: 1.8rem !important; }}
-    h3 {{ font-size: 1.4rem !important; }}
-    p {{ font-size: 1rem !important; }}
-
-    /* Hide Streamlit header/footer for 'App' feel */
+    /* Forecast Row Styling */
+    .forecast-row {{
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }}
+    
     header {{visibility: hidden;}}
     footer {{visibility: hidden;}}
     </style>
     """, unsafe_allow_html=True)
 
-# 3. DATA LOGIC
-def get_weather_data(city):
+# 3. DATA LOGIC (Current + 7 Day Forecast)
+def get_full_weather(city):
     try:
+        # Current Weather
         curr_url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={API_KEY}&units=metric"
         curr_data = requests.get(curr_url).json()
         
+        # 5-Day / 3-Hour Forecast (API limitation: Free tier provides 5 days)
         fore_url = f"https://api.openweathermap.org/data/2.5/forecast?q={city}&appid={API_KEY}&units=metric"
         fore_data = requests.get(fore_url).json()
         
-        total_rain = 0
+        forecast_list = []
+        total_rain_24h = 0
+        
         if fore_data.get("cod") == "200":
+            # Calculate 24h rain
             for i in range(8):
-                rain = fore_data['list'][i].get('rain', {}).get('3h', 0)
-                total_rain += rain
-        return curr_data, total_rain
+                total_rain_24h += fore_data['list'][i].get('rain', {}).get('3h', 0)
+            
+            # Extract daily data (taking 12:00 PM slot for each day)
+            for item in fore_data['list']:
+                if "12:00:00" in item['dt_txt']:
+                    date_obj = datetime.fromtimestamp(item['dt'])
+                    forecast_list.append({
+                        "day": date_obj.strftime("%A"),
+                        "temp": round(item['main']['temp']),
+                        "icon": item['weather'][0]['icon'],
+                        "desc": item['weather'][0]['main']
+                    })
+                    
+        return curr_data, total_rain_24h, forecast_list
     except:
-        return None, 0
+        return None, 0, []
 
 # 4. MAIN APP
 def main():
-    # Search bar at the very top
-    city_name = st.text_input("Search City", value="Malolos")
-    
-    data, total_rain = get_weather_data(city_name)
+    city_name = st.text_input("📍 Search City", value="Manila")
+    data, total_rain, forecast = get_full_weather(city_name)
     
     if data and data.get("cod") == 200:
-        # Day/Night Check
         current_time = time.time()
         is_day = data['sys']['sunrise'] < current_time < data['sys']['sunset']
-        
         apply_mobile_design(data['weather'][0]['main'], is_day)
         
-        # --- CARD 1: MAIN WEATHER ---
+        # --- CURRENT WEATHER CARD ---
         with st.container(border=True):
-            # On mobile, we stack these or use small columns
-            st.markdown(f"**{data['name']}**")
-            st.write(datetime.now().strftime('%A, %B %d'))
-            
-            # Big Temp and Icon side-by-side
+            st.write(f"**{data['name']}** | {datetime.now().strftime('%b %d')}")
             col_t1, col_t2 = st.columns([1, 1])
             with col_t1:
                 st.markdown(f"<h1 style='margin:0;'>{round(data['main']['temp'])}°C</h1>", unsafe_allow_html=True)
             with col_t2:
-                icon_code = data['weather'][0]['icon']
-                st.image(f"http://openweathermap.org/img/wn/{icon_code}@2x.png", width=80)
-            
+                st.image(f"http://openweathermap.org/img/wn/{data['weather'][0]['icon']}@2x.png", width=70)
             st.write(f"💧 {data['main']['humidity']}% | 💨 {round(data['wind']['speed'] * 3.6)} km/h")
 
-        # --- CARD 2: RAINFALL ---
+        # --- ADVISORIES ---
+        st.subheader("📢 Alerts")
         with st.container(border=True):
-            st.markdown(f"### 🌧️ 24h Rainfall")
-            st.markdown(f"**{total_rain} mm**")
-            if total_rain >= 30:
-                st.error("🔴 RED: Suspend Classes")
-            elif total_rain >= 15:
-                st.warning("🟠 ORANGE: Flooding Threat")
-            else:
-                st.write("✅ Rainfall is normal")
-
-        # --- CARD 3: HEAT INDEX ---
-        with st.container(border=True):
+            # Rainfall
+            if total_rain >= 30: st.error(f"🌧️ Rain: {total_rain}mm (RED)")
+            else: st.write(f"🌧️ Rain: {total_rain}mm (Normal)")
+            
+            # Heat
             temp = data['main']['temp']
-            st.markdown(f"### 🌡️ Heat Index")
-            st.markdown(f"**{round(temp)}°C**")
-            if temp >= 42:
-                st.error("🔥 Extreme Danger")
-            elif temp >= 33:
-                st.warning("⚠️ High Heat")
-            else:
-                st.write("✅ Temperature safe")
+            if temp >= 33: st.warning(f"🌡️ Heat: {round(temp)}°C (High)")
+            else: st.write(f"🌡️ Heat: {round(temp)}°C (Safe)")
 
-    else:
-        st.error("City not found. Try again!")
+        # --- 1-WEEK FORECAST (Vertical List for Mobile) ---
+        st.subheader("🗓️ Next 5 Days")
+        with st.container(border=True):
+            for day in forecast:
+                # Custom HTML row for a clean mobile list look
+                st.markdown(f"""
+                <div class="forecast-row">
+                    <div style="flex: 1; font-weight: bold;">{day['day'][:3]}</div>
+                    <div style="flex: 1; text-align: center;">
+                        <img src="http://openweathermap.org/img/wn/{day['icon']}.png" width="30">
+                    </div>
+                    <div style="flex: 1; text-align: right;">{day['temp']}°C</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+    elif city_name:
+        st.error("City not found!")
 
 if __name__ == "__main__":
     main()
