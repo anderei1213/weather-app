@@ -82,7 +82,7 @@ def get_full_weather(city):
 
 # 4. MAIN APP
 def main():
-    city_name = st.text_input("📍 Search City", value="Manila")
+    city_name = st.text_input("📍 Search City", value="Guinhawa, Malolos")
     data, total_rain, forecast = get_full_weather(city_name)
     
     if data and data.get("cod") == 200:
